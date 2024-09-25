@@ -45,6 +45,9 @@ func main() {
 	})
 
 	e := commonHTTP.NewEcho()
+	e.GET("/health", func(c echo.Context) error {
+		return c.String(http.StatusOK, "ok")
+	})
 
 	e.POST("/tickets-confirmation", func(c echo.Context) error {
 		var request TicketsConfirmationRequest
@@ -70,6 +73,8 @@ func main() {
 	})
 
 	g.Go(func() error {
+		<-router.Running()
+
 		err := e.Start(":8080")
 		if err != nil && err != http.ErrServerClosed {
 			return err
