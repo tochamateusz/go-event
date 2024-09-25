@@ -2,6 +2,7 @@ github.com/ThreeDotsLabs/go-event-driven v0.0.10 h1:hlGBh0sXe51y6xNl7YDsEZiTAUyi
 github.com/ThreeDotsLabs/watermill v1.3.2 h1:uU0F+sDmjHh6aYr0xo4gBZy8Tq77DM5F2cvJU46CO6I=
 github.com/ThreeDotsLabs/watermill v1.3.2/go.mod h1:zn/7F0TGOr1K/RX7bFbVxii6p1abOMLllAMpVpKinQg=
 github.com/ThreeDotsLabs/watermill-redisstream v1.0.0/go.mod h1:h0ioBPNtnczu+ADhol7UgFBM1hTbmgqJYrfSt+Zoi28=
+github.com/ThreeDotsLabs/watermill-redisstream v1.1.0/go.mod h1:h0ioBPNtnczu+ADhol7UgFBM1hTbmgqJYrfSt+Zoi28=
 github.com/alecthomas/kingpin/v2 v2.4.0/go.mod h1:0gyi0zQnjuFk8xrkNKamJoyUo382HRL7ATRpFZCw6tE=
 github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137/go.mod h1:OMCwj8VM1Kc9e19TLln2VL61YJF0x1XFtfdL4JdbSyE=
 github.com/apapsch/go-jsonmerge/v2 v2.0.0 h1:axGnT1gRIfimI7gJifB699GoE/oq+F2MU7Dml6nw9rQ=
