@@ -7,6 +7,11 @@ const (
 	TaskAppendToTracker
 )
 
+var TopicsMap = map[Task]string{
+	TaskIssueReceipt:    "issue-receipt",
+	TaskAppendToTracker: "append-to-tracker",
+}
+
 type Message struct {
 	Task     Task
 	TicketID string

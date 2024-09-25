@@ -19,14 +19,15 @@ type Handler struct {
 }
 
 type Worker struct {
-	taskMap    map[Task]Handler
 	publisher  message.Publisher
 	subscriber message.Subscriber
+	router     *message.Router
 }
 
-func NewWorker() *Worker {
+func NewWorker(router *message.Router) *Worker {
 
 	logger := watermill.NewStdLogger(false, false)
+	logger = logger.With(watermill.LogFields{"context": "worker"})
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr: os.Getenv("REDIS_ADDR"),
@@ -44,70 +45,61 @@ func NewWorker() *Worker {
 		panic(err)
 	}
 
-	subscriber, err := redisstream.NewSubscriber(redisstream.SubscriberConfig{
-		Client: rdb,
+	trackerSub, err := redisstream.NewSubscriber(redisstream.SubscriberConfig{
+		Client:        rdb,
+		ConsumerGroup: "append-to-tracker",
+	}, logger)
+	if err != nil {
+		panic(err)
+	}
+
+	issuerSub, err := redisstream.NewSubscriber(redisstream.SubscriberConfig{
+		Client:        rdb,
+		ConsumerGroup: "issue-receipt",
 	}, logger)
 	if err != nil {
 		panic(err)
 	}
 
 	spreadsheetsClient := internal_client.NewSpreadsheetsClient(clients)
-	receiptsClient := internal_client.NewReceiptsClient(clients)
+	router.AddNoPublisherHandler("append-to-tracker-handler",
+		"append-to-tracker",
+		trackerSub,
+		func(msg *message.Message) error {
+			return spreadsheetsClient.AppendRow(context.Background(), "tickets-to-print", []string{string(msg.Payload)})
+		},
+	)
 
-	taskMap := map[Task]Handler{
-		TaskAppendToTracker: {
-			Handler: func(ctx context.Context, m Message) error {
-				return spreadsheetsClient.AppendRow(context.Background(), "tickets-to-print", []string{m.TicketID})
-			},
-			Name: "append-to-tracker",
+	receiptsClient := internal_client.NewReceiptsClient(clients)
+	router.AddNoPublisherHandler("issue-receipt-handler",
+		"issue-receipt",
+		issuerSub,
+		func(msg *message.Message) error {
+			return receiptsClient.IssueReceipt(context.Background(), string(msg.Payload))
 		},
-		TaskIssueReceipt: {
-			Handler: func(ctx context.Context, m Message) error {
-				return receiptsClient.IssueReceipt(context.Background(), m.TicketID)
-			},
-			Name: "issue-receipt",
-		},
-	}
+	)
 
 	return &Worker{
-		taskMap:    taskMap,
-		publisher:  publisher,
-		subscriber: subscriber,
+		publisher: publisher,
+		router:    router,
 	}
 }
 
 func (w *Worker) Send(msg ...Message) {
 	for _, m := range msg {
 		newMsg := message.NewMessage(watermill.NewUUID(), []byte(m.TicketID))
-		task, ok := w.taskMap[m.Task]
+		task, ok := TopicsMap[m.Task]
 		if !ok {
 			continue
 		}
-		w.publisher.Publish(task.Name, newMsg)
+		w.publisher.Publish(task, newMsg)
 	}
 }
 
-func (w *Worker) Run() {
-
-	for task, handler := range w.taskMap {
-		go func(task Task, handler Handler) {
-			messages, err := w.subscriber.Subscribe(context.Background(), handler.Name)
-			if err != nil {
-				panic(err)
-			}
-
-			for msg := range messages {
-				err = handler.Handler(msg.Context(), Message{
-					Task:     task,
-					TicketID: string(msg.Payload),
-				})
-				if err != nil {
-					msg.Nack()
-				} else {
-					msg.Ack()
-				}
-			}
-
-		}(task, handler)
+func (w *Worker) Run() error {
+	err := w.router.Run(context.Background())
+	if err != nil {
+		return err
 	}
+	return nil
 }
