@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strconv"
 
@@ -30,28 +31,13 @@ func main() {
 		panic(err)
 	}
 
-	pub, err := redisstream.NewPublisher(redisstream.PublisherConfig{
-		Client: rdb,
-	}, logger)
-	if err != nil {
-		panic(err)
-	}
-
-	router.AddHandler(
+	router.AddNoPublisherHandler(
 		"temperature",
-		"temperature-celsius",
-		sub,
 		"temperature-fahrenheit",
-		pub,
-		func(msg *message.Message) ([]*message.Message, error) {
-			temp, err := celsiusToFahrenheit(string(msg.Payload))
-			if err != nil {
-				return nil, err
-			}
-
-			newMsg := message.NewMessage(watermill.NewUUID(), message.Payload(temp))
-
-			return []*message.Message{newMsg}, nil
+		sub,
+		func(msg *message.Message) error {
+			fmt.Printf("Temperature read: %s\n", string(msg.Payload))
+			return nil
 		},
 	)
 
