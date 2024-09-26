@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"tickets/modules/worker"
+	"time"
 
 	commonHTTP "github.com/ThreeDotsLabs/go-event-driven/common/http"
 	"github.com/ThreeDotsLabs/go-event-driven/common/log"
@@ -64,29 +64,54 @@ func main() {
 			return err
 		}
 
+	ticker_loop:
 		for _, ticket := range request.Tickets {
-			fmt.Printf("Ticket: %+v\n", ticket)
-			body := worker.AppendToTrackerPayload{
-				TicketId: ticket.ID,
-				Price: worker.Money{
-					Amount:   ticket.Price.Amount,
-					Currency: ticket.Price.Currency,
-				},
+			switch ticket.Status {
+			case "confirmed":
+				{
+					event := worker.TicketBookingConfirmedEvent{
+						Header: worker.EventHeader{
+							Id:          ticket.ID,
+							PublishedAt: time.Now().Format(time.RFC3339),
+						},
+						TicketId:      ticket.ID,
+						CustomerEmail: ticket.CustomerEmail,
+						Price: worker.Money{
+							Amount:   ticket.Price.Amount,
+							Currency: ticket.Price.Currency,
+						},
+					}
+
+					data, err := json.Marshal(event)
+					if err != nil {
+						return err
+					}
+					newMsg := message.NewMessage(watermill.NewUUID(), data)
+					w.Send(worker.TicketBookingConfirmed, newMsg)
+					continue ticker_loop
+				}
+			case "canceled":
+				{
+					event := worker.TicketBookingCanceledEvent{
+						Header:        worker.EventHeader{Id: ticket.ID, PublishedAt: time.Now().Format(time.RFC3339)},
+						TicketID:      ticket.ID,
+						CustomerEmail: ticket.CustomerEmail,
+						Price: worker.Money{
+							Amount:   ticket.Price.Amount,
+							Currency: ticket.Price.Currency,
+						},
+					}
+
+					data, err := json.Marshal(event)
+					if err != nil {
+						return err
+					}
+					newMsg := message.NewMessage(watermill.NewUUID(), data)
+					w.Send(worker.TicketBookingCanceled, newMsg)
+					continue ticker_loop
+
+				}
 			}
-
-			data, _ := json.Marshal(body)
-			newMessage := message.NewMessage(watermill.NewUUID(), data)
-			w.Send(worker.TaskIssueReceipt, newMessage)
-
-			appendToTrackerPayload := worker.AppendToTrackerPayload{
-				TicketId:      ticket.ID,
-				CustomerEmail: ticket.CustomerEmail,
-				Price:         ticket.Price,
-			}
-
-			data, _ = json.Marshal(appendToTrackerPayload)
-			newMessage = message.NewMessage(watermill.NewUUID(), data)
-			w.Send(worker.TaskAppendToTracker, newMessage)
 		}
 
 		return c.NoContent(http.StatusOK)

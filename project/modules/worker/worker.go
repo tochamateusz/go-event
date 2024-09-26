@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	internal_client "tickets/modules/clients"
 
@@ -43,6 +44,25 @@ type AppendToTrackerPayload struct {
 	Price         Money  `json:"price"`
 }
 
+type EventHeader struct {
+	Id          string `json:"id"`
+	PublishedAt string `json:"published_at"`
+}
+
+type TicketBookingConfirmedEvent struct {
+	Header        EventHeader
+	TicketId      string `json:"ticket_id"`
+	CustomerEmail string `json:"customer_email"`
+	Price         Money  `json:"price"`
+}
+
+type TicketBookingCanceledEvent struct {
+	Header        EventHeader `json:"header"`
+	TicketID      string      `json:"ticket_id"`
+	CustomerEmail string      `json:"customer_email"`
+	Price         Money       `json:"price"`
+}
+
 func NewWorker(router *message.Router) *Worker {
 
 	logger := watermill.NewStdLogger(false, false)
@@ -80,12 +100,20 @@ func NewWorker(router *message.Router) *Worker {
 		panic(err)
 	}
 
+	refundTickerSub, err := redisstream.NewSubscriber(redisstream.SubscriberConfig{
+		Client:        rdb,
+		ConsumerGroup: "tickets-to-refund",
+	}, logger)
+	if err != nil {
+		panic(err)
+	}
+
 	spreadsheetsClient := internal_client.NewSpreadsheetsClient(clients)
-	router.AddNoPublisherHandler("append-to-tracker-handler",
-		"append-to-tracker",
+	router.AddNoPublisherHandler("append-to-tracker-confirmed-handler",
+		TopicsMap[TicketBookingConfirmed],
 		trackerSub,
 		func(msg *message.Message) error {
-			payload := AppendToTrackerPayload{}
+			payload := TicketBookingCanceledEvent{}
 			err := json.Unmarshal(msg.Payload, &payload)
 			if err != nil {
 				return err
@@ -93,7 +121,28 @@ func NewWorker(router *message.Router) *Worker {
 
 			return spreadsheetsClient.AppendRow(context.Background(), "tickets-to-print",
 				[]string{
-					payload.TicketId,
+					payload.TicketID,
+					payload.CustomerEmail,
+					payload.Price.Amount,
+					payload.Price.Currency})
+		},
+	)
+
+	router.AddNoPublisherHandler("append-to-tracker-refund-handler",
+		TopicsMap[TicketBookingCanceled],
+		refundTickerSub,
+		func(msg *message.Message) error {
+
+			payload := TicketBookingCanceledEvent{}
+			err := json.Unmarshal(msg.Payload, &payload)
+			fmt.Printf("\n\n%+v\n\n", payload)
+			if err != nil {
+				return err
+			}
+
+			return spreadsheetsClient.AppendRow(context.Background(), "tickets-to-refund",
+				[]string{
+					payload.TicketID,
 					payload.CustomerEmail,
 					payload.Price.Amount,
 					payload.Price.Currency})
@@ -102,17 +151,17 @@ func NewWorker(router *message.Router) *Worker {
 
 	receiptsClient := internal_client.NewReceiptsClient(clients)
 	router.AddNoPublisherHandler("issue-receipt-handler",
-		"issue-receipt",
+		TopicsMap[TicketBookingConfirmed],
 		issuerSub,
 		func(msg *message.Message) error {
-			payload := internal_client.IssueReceiptRequest{}
+			payload := TicketBookingConfirmedEvent{}
 			err := json.Unmarshal(msg.Payload, &payload)
 			if err != nil {
 				return err
 			}
 
 			return receiptsClient.IssueReceipt(context.Background(), internal_client.IssueReceiptRequest{
-				TicketID: payload.TicketID,
+				TicketID: payload.TicketId,
 				Price: internal_client.Money{
 					Amount:   payload.Price.Amount,
 					Currency: payload.Price.Currency,
