@@ -1,4 +1,6 @@
 github.com/ThreeDotsLabs/go-event-driven v0.0.10 h1:hlGBh0sXe51y6xNl7YDsEZiTAUyiO1P92R0/V/J0+nM=
+github.com/ThreeDotsLabs/go-event-driven v0.0.12 h1:GRMpjUFJ5B3XSBm+mSj9XM5dWbQotS1zhS6EDaicG0Q=
+github.com/ThreeDotsLabs/go-event-driven v0.0.12/go.mod h1:W7gf0SSg7Gsoh6hm+Fv2hKrH8KJmjNSyvTC7uxqX58k=
 github.com/ThreeDotsLabs/watermill v1.3.2 h1:uU0F+sDmjHh6aYr0xo4gBZy8Tq77DM5F2cvJU46CO6I=
 github.com/ThreeDotsLabs/watermill v1.3.2/go.mod h1:zn/7F0TGOr1K/RX7bFbVxii6p1abOMLllAMpVpKinQg=
 github.com/ThreeDotsLabs/watermill-redisstream v1.0.0/go.mod h1:h0ioBPNtnczu+ADhol7UgFBM1hTbmgqJYrfSt+Zoi28=

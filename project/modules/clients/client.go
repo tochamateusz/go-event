@@ -1,4 +1,4 @@
-package internal_client 
+package internal_client
 
 import (
 	"context"
@@ -20,17 +20,33 @@ func NewReceiptsClient(clients *clients.Clients) ReceiptsClient {
 	}
 }
 
-func (c ReceiptsClient) IssueReceipt(ctx context.Context, ticketID string) error {
-	body := receipts.PutReceiptsJSONRequestBody{
-		TicketId: ticketID,
+type Money struct {
+	Amount   string `json:"amount"`
+	Currency string `json:"currency"`
+}
+
+type IssueReceiptRequest struct {
+	TicketID string `json:"ticket_id"`
+	Price    Money  `json:"price"`
+}
+
+func (c ReceiptsClient) IssueReceipt(ctx context.Context, request IssueReceiptRequest) error {
+
+	body := receipts.CreateReceipt{
+		Price: receipts.Money{
+			MoneyAmount:   request.Price.Amount,
+			MoneyCurrency: request.Price.Currency,
+		},
+		TicketId: request.TicketID,
 	}
 
-	receiptsResp, err := c.clients.Receipts.PutReceiptsWithResponse(ctx, body)
+	response, err := c.clients.Receipts.PutReceiptsWithResponse(ctx, body)
 	if err != nil {
 		return err
 	}
-	if receiptsResp.StatusCode() != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %v", receiptsResp.StatusCode())
+
+	if response.StatusCode() != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %v", response.StatusCode())
 	}
 
 	return nil

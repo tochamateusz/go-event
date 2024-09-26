@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	internal_client "tickets/modules/clients"
 
@@ -14,7 +15,7 @@ import (
 )
 
 type Handler struct {
-	Handler func(context.Context, Message) error
+	Handler func(context.Context, *message.Message) error
 	Name    string
 }
 
@@ -22,6 +23,24 @@ type Worker struct {
 	publisher  message.Publisher
 	subscriber message.Subscriber
 	router     *message.Router
+}
+
+type Money struct {
+	Amount   string `json:"amount"`
+	Currency string `json:"currency"`
+}
+
+type Ticket struct {
+	ID            string `json:"ticket_id"`
+	Status        string `json:"status"`
+	CustomerEmail string `json:"customer_email"`
+	Price         Money  `json:"price"`
+}
+
+type AppendToTrackerPayload struct {
+	TicketId      string `json:"ticket_id"`
+	CustomerEmail string `json:"customer_email"`
+	Price         Money  `json:"price"`
 }
 
 func NewWorker(router *message.Router) *Worker {
@@ -66,7 +85,18 @@ func NewWorker(router *message.Router) *Worker {
 		"append-to-tracker",
 		trackerSub,
 		func(msg *message.Message) error {
-			return spreadsheetsClient.AppendRow(context.Background(), "tickets-to-print", []string{string(msg.Payload)})
+			payload := AppendToTrackerPayload{}
+			err := json.Unmarshal(msg.Payload, &payload)
+			if err != nil {
+				return err
+			}
+
+			return spreadsheetsClient.AppendRow(context.Background(), "tickets-to-print",
+				[]string{
+					payload.TicketId,
+					payload.CustomerEmail,
+					payload.Price.Amount,
+					payload.Price.Currency})
 		},
 	)
 
@@ -75,7 +105,19 @@ func NewWorker(router *message.Router) *Worker {
 		"issue-receipt",
 		issuerSub,
 		func(msg *message.Message) error {
-			return receiptsClient.IssueReceipt(context.Background(), string(msg.Payload))
+			payload := internal_client.IssueReceiptRequest{}
+			err := json.Unmarshal(msg.Payload, &payload)
+			if err != nil {
+				return err
+			}
+
+			return receiptsClient.IssueReceipt(context.Background(), internal_client.IssueReceiptRequest{
+				TicketID: payload.TicketID,
+				Price: internal_client.Money{
+					Amount:   payload.Price.Amount,
+					Currency: payload.Price.Currency,
+				},
+			})
 		},
 	)
 
@@ -85,14 +127,13 @@ func NewWorker(router *message.Router) *Worker {
 	}
 }
 
-func (w *Worker) Send(msg ...Message) {
+func (w *Worker) Send(task Task, msg ...*message.Message) {
 	for _, m := range msg {
-		newMsg := message.NewMessage(watermill.NewUUID(), []byte(m.TicketID))
-		task, ok := TopicsMap[m.Task]
+		task, ok := TopicsMap[task]
 		if !ok {
 			continue
 		}
-		w.publisher.Publish(task, newMsg)
+		w.publisher.Publish(task, m)
 	}
 }
 

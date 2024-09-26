@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,6 +20,10 @@ import (
 
 type TicketsConfirmationRequest struct {
 	Tickets []string `json:"tickets"`
+}
+
+type TicketStatusRequest struct {
+	Tickets []worker.Ticket `json:"tickets"`
 }
 
 type httpError struct {
@@ -49,6 +55,43 @@ func main() {
 		return c.String(http.StatusOK, "ok")
 	})
 
+	e.POST("/tickets-status", func(c echo.Context) error {
+
+		var request TicketStatusRequest
+		err = c.Bind(&request)
+		if err != nil {
+			logger.Error("can't bind", err, make(watermill.LogFields))
+			return err
+		}
+
+		for _, ticket := range request.Tickets {
+			fmt.Printf("Ticket: %+v\n", ticket)
+			body := worker.AppendToTrackerPayload{
+				TicketId: ticket.ID,
+				Price: worker.Money{
+					Amount:   ticket.Price.Amount,
+					Currency: ticket.Price.Currency,
+				},
+			}
+
+			data, _ := json.Marshal(body)
+			newMessage := message.NewMessage(watermill.NewUUID(), data)
+			w.Send(worker.TaskIssueReceipt, newMessage)
+
+			appendToTrackerPayload := worker.AppendToTrackerPayload{
+				TicketId:      ticket.ID,
+				CustomerEmail: ticket.CustomerEmail,
+				Price:         ticket.Price,
+			}
+
+			data, _ = json.Marshal(appendToTrackerPayload)
+			newMessage = message.NewMessage(watermill.NewUUID(), data)
+			w.Send(worker.TaskAppendToTracker, newMessage)
+		}
+
+		return c.NoContent(http.StatusOK)
+	})
+
 	e.POST("/tickets-confirmation", func(c echo.Context) error {
 		var request TicketsConfirmationRequest
 		err := c.Bind(&request)
@@ -57,16 +100,9 @@ func main() {
 		}
 
 		for _, ticket := range request.Tickets {
-
-			w.Send(worker.Message{
-				Task:     worker.TaskIssueReceipt,
-				TicketID: ticket,
-			})
-
-			w.Send(worker.Message{
-				Task:     worker.TaskAppendToTracker,
-				TicketID: ticket,
-			})
+			newMessage := message.NewMessage(watermill.NewUUID(), message.Payload(ticket))
+			w.Send(worker.TaskIssueReceipt, newMessage)
+			w.Send(worker.TaskAppendToTracker, newMessage)
 		}
 
 		return c.NoContent(http.StatusOK)

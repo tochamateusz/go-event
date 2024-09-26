@@ -2,16 +2,34 @@ package main
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/google/uuid"
 )
 
+type Header struct {
+	ID          string `json:"id"`
+	EventName   string `json:"event_name"`
+	PublishedAt string `json:"occurred_at"`
+}
+
+func NewHeader(eventName string) Header {
+	return Header{
+		ID:          uuid.NewString(),
+		EventName:   eventName,
+		PublishedAt: time.Now().Format(time.RFC3339),
+	}
+}
+
 type ProductOutOfStock struct {
+	Header    Header `json:"header"`
 	ProductID string `json:"product_id"`
 }
 
 type ProductBackInStock struct {
+	Header    Header `json:"header"`
 	ProductID string `json:"product_id"`
 	Quantity  int    `json:"quantity"`
 }
@@ -28,6 +46,7 @@ func NewPublisher(pub message.Publisher) Publisher {
 
 func (p Publisher) PublishProductOutOfStock(productID string) error {
 	event := ProductOutOfStock{
+		Header:    NewHeader("ProductOutOfStock"),
 		ProductID: productID,
 	}
 
@@ -43,6 +62,7 @@ func (p Publisher) PublishProductOutOfStock(productID string) error {
 
 func (p Publisher) PublishProductBackInStock(productID string, quantity int) error {
 	event := ProductBackInStock{
+		Header:    NewHeader("ProductBackInStock"),
 		ProductID: productID,
 		Quantity:  quantity,
 	}
