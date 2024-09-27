@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	internal_client "tickets/modules/clients"
 
@@ -11,8 +12,10 @@ import (
 	"github.com/ThreeDotsLabs/watermill-redisstream/pkg/redisstream"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/redis/go-redis/v9"
+	"github.com/sirupsen/logrus"
 
 	external_clients "github.com/ThreeDotsLabs/go-event-driven/common/clients"
+	"github.com/ThreeDotsLabs/go-event-driven/common/log"
 )
 
 type Handler struct {
@@ -63,6 +66,17 @@ type TicketBookingCanceledEvent struct {
 	Price         Money       `json:"price"`
 }
 
+func LogUUIDMiddleware(next message.HandlerFunc) message.HandlerFunc {
+	return func(msg *message.Message) ([]*message.Message, error) {
+
+		logrus.
+			WithField("message_uuid", msg.UUID).
+			WithField("correlation_id", log.CorrelationIDFromContext(msg.Context())).
+			Info("Handling a message")
+		return next(msg)
+	}
+}
+
 func NewWorker(router *message.Router) *Worker {
 
 	logger := watermill.NewStdLogger(false, false)
@@ -72,7 +86,14 @@ func NewWorker(router *message.Router) *Worker {
 		Addr: os.Getenv("REDIS_ADDR"),
 	})
 
-	clients, err := external_clients.NewClients(os.Getenv("GATEWAY_ADDR"), nil)
+	clients, err := external_clients.NewClients(os.Getenv("GATEWAY_ADDR"),
+		func(ctx context.Context, req *http.Request) error {
+			correlationId := log.CorrelationIDFromContext(ctx)
+			fmt.Printf("\n\nCLIENT CONTEX: %s\n\n", correlationId)
+
+			req.Header.Set("Correlation-ID", correlationId)
+			return nil
+		})
 	if err != nil {
 		panic(err)
 	}
@@ -108,6 +129,8 @@ func NewWorker(router *message.Router) *Worker {
 		panic(err)
 	}
 
+	router.AddMiddleware(LogUUIDMiddleware)
+
 	spreadsheetsClient := internal_client.NewSpreadsheetsClient(clients)
 	router.AddNoPublisherHandler("append-to-tracker-confirmed-handler",
 		TopicsMap[TicketBookingConfirmed],
@@ -119,7 +142,10 @@ func NewWorker(router *message.Router) *Worker {
 				return err
 			}
 
-			return spreadsheetsClient.AppendRow(context.Background(), "tickets-to-print",
+			ctx := log.ContextWithCorrelationID(msg.Context(), msg.Metadata.Get("correlation_id"))
+			msg.SetContext(ctx)
+
+			return spreadsheetsClient.AppendRow(msg.Context(), "tickets-to-print",
 				[]string{
 					payload.TicketID,
 					payload.CustomerEmail,
@@ -132,15 +158,16 @@ func NewWorker(router *message.Router) *Worker {
 		TopicsMap[TicketBookingCanceled],
 		refundTickerSub,
 		func(msg *message.Message) error {
-
 			payload := TicketBookingCanceledEvent{}
 			err := json.Unmarshal(msg.Payload, &payload)
-			fmt.Printf("\n\n%+v\n\n", payload)
 			if err != nil {
 				return err
 			}
 
-			return spreadsheetsClient.AppendRow(context.Background(), "tickets-to-refund",
+			ctx := log.ContextWithCorrelationID(msg.Context(), msg.Metadata.Get("correlation_id"))
+			msg.SetContext(ctx)
+
+			return spreadsheetsClient.AppendRow(msg.Context(), "tickets-to-refund",
 				[]string{
 					payload.TicketID,
 					payload.CustomerEmail,
@@ -160,7 +187,10 @@ func NewWorker(router *message.Router) *Worker {
 				return err
 			}
 
-			return receiptsClient.IssueReceipt(context.Background(), internal_client.IssueReceiptRequest{
+			ctx := log.ContextWithCorrelationID(msg.Context(), msg.Metadata.Get("correlation_id"))
+			msg.SetContext(ctx)
+
+			return receiptsClient.IssueReceipt(msg.Context(), internal_client.IssueReceiptRequest{
 				TicketID: payload.TicketId,
 				Price: internal_client.Money{
 					Amount:   payload.Price.Amount,

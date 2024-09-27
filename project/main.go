@@ -14,6 +14,7 @@ import (
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/labstack/echo/v4"
+	"github.com/lithammer/shortuuid"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -64,6 +65,8 @@ func main() {
 			return err
 		}
 
+		correlationID := c.Request().Header.Get("Correlation-Id")
+
 	ticker_loop:
 		for _, ticket := range request.Tickets {
 			switch ticket.Status {
@@ -87,6 +90,7 @@ func main() {
 						return err
 					}
 					newMsg := message.NewMessage(watermill.NewUUID(), data)
+					newMsg.Metadata.Set("correlation_id", correlationID)
 					w.Send(worker.TicketBookingConfirmed, newMsg)
 					continue ticker_loop
 				}
@@ -107,6 +111,7 @@ func main() {
 						return err
 					}
 					newMsg := message.NewMessage(watermill.NewUUID(), data)
+					newMsg.Metadata.Set("correlation_id", correlationID)
 					w.Send(worker.TicketBookingCanceled, newMsg)
 					continue ticker_loop
 
@@ -124,8 +129,14 @@ func main() {
 			return err
 		}
 
+		correlationID := c.Request().Header.Get("Correlation-Id")
+		if correlationID == "" {
+			correlationID = "gen_" + shortuuid.New()
+		}
+
 		for _, ticket := range request.Tickets {
 			newMessage := message.NewMessage(watermill.NewUUID(), message.Payload(ticket))
+			newMessage.Metadata.Set("correlation_id", correlationID)
 			w.Send(worker.TaskIssueReceipt, newMessage)
 			w.Send(worker.TaskAppendToTracker, newMessage)
 		}
