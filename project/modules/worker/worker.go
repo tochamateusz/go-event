@@ -67,7 +67,16 @@ type TicketBookingCanceledEvent struct {
 }
 
 func LogUUIDMiddleware(next message.HandlerFunc) message.HandlerFunc {
-	return func(msg *message.Message) ([]*message.Message, error) {
+	return func(msg *message.Message) (msgs []*message.Message, err error) {
+		defer func() {
+			if err != nil {
+
+				logrus.
+					WithField("message_uuid", msg.UUID).
+					WithField("error", err.Error()).
+					Info("Message handling error")
+			}
+		}()
 
 		logrus.
 			WithField("message_uuid", msg.UUID).
