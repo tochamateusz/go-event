@@ -3,14 +3,16 @@ package worker
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net/http"
 	"os"
 	internal_client "tickets/modules/clients"
+	"time"
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill-redisstream/pkg/redisstream"
 	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 
@@ -49,6 +51,7 @@ type AppendToTrackerPayload struct {
 
 type EventHeader struct {
 	Id          string `json:"id"`
+	Type        string `json:"type"`
 	PublishedAt string `json:"published_at"`
 }
 
@@ -64,6 +67,16 @@ type TicketBookingCanceledEvent struct {
 	TicketID      string      `json:"ticket_id"`
 	CustomerEmail string      `json:"customer_email"`
 	Price         Money       `json:"price"`
+}
+
+type MissingType struct{}
+
+func (m MissingType) Error() string {
+	return "missing the invoice number - can't continue"
+}
+
+func (m MissingType) IsPermanent() bool {
+	return true
 }
 
 func LogUUIDMiddleware(next message.HandlerFunc) message.HandlerFunc {
@@ -86,6 +99,23 @@ func LogUUIDMiddleware(next message.HandlerFunc) message.HandlerFunc {
 	}
 }
 
+type PermanentError interface {
+	IsPermanent() bool
+}
+
+func SkipPermanentErrorsMiddleware(h message.HandlerFunc) message.HandlerFunc {
+	return func(msg *message.Message) ([]*message.Message, error) {
+		msgs, err := h(msg)
+
+		var permErr PermanentError
+		if errors.As(err, &permErr) && permErr.IsPermanent() {
+			return nil, nil
+		}
+
+		return msgs, err
+	}
+}
+
 func NewWorker(router *message.Router) *Worker {
 
 	logger := watermill.NewStdLogger(false, false)
@@ -98,7 +128,6 @@ func NewWorker(router *message.Router) *Worker {
 	clients, err := external_clients.NewClients(os.Getenv("GATEWAY_ADDR"),
 		func(ctx context.Context, req *http.Request) error {
 			correlationId := log.CorrelationIDFromContext(ctx)
-			fmt.Printf("\n\nCLIENT CONTEX: %s\n\n", correlationId)
 
 			req.Header.Set("Correlation-ID", correlationId)
 			return nil
@@ -138,6 +167,16 @@ func NewWorker(router *message.Router) *Worker {
 		panic(err)
 	}
 
+	retryMiddleware := middleware.Retry{
+		MaxRetries:      10,
+		InitialInterval: time.Millisecond * 100,
+		MaxInterval:     time.Second,
+		Multiplier:      2,
+		Logger:          logger,
+	}
+
+	router.AddMiddleware(retryMiddleware.Middleware)
+	router.AddMiddleware(SkipPermanentErrorsMiddleware)
 	router.AddMiddleware(LogUUIDMiddleware)
 
 	spreadsheetsClient := internal_client.NewSpreadsheetsClient(clients)
@@ -148,7 +187,7 @@ func NewWorker(router *message.Router) *Worker {
 			payload := TicketBookingCanceledEvent{}
 			err := json.Unmarshal(msg.Payload, &payload)
 			if err != nil {
-				return err
+				return MissingType{}
 			}
 
 			ctx := log.ContextWithCorrelationID(msg.Context(), msg.Metadata.Get("correlation_id"))
@@ -167,10 +206,11 @@ func NewWorker(router *message.Router) *Worker {
 		TopicsMap[TicketBookingCanceled],
 		refundTickerSub,
 		func(msg *message.Message) error {
+
 			payload := TicketBookingCanceledEvent{}
-			err := json.Unmarshal(msg.Payload, &payload)
+			err = json.Unmarshal(msg.Payload, &payload)
 			if err != nil {
-				return err
+				return MissingType{}
 			}
 
 			ctx := log.ContextWithCorrelationID(msg.Context(), msg.Metadata.Get("correlation_id"))
@@ -193,7 +233,7 @@ func NewWorker(router *message.Router) *Worker {
 			payload := TicketBookingConfirmedEvent{}
 			err := json.Unmarshal(msg.Payload, &payload)
 			if err != nil {
-				return err
+				return MissingType{}
 			}
 
 			ctx := log.ContextWithCorrelationID(msg.Context(), msg.Metadata.Get("correlation_id"))
