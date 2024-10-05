@@ -6,9 +6,10 @@ import (
 	ticketsHttp "tickets/http"
 	"tickets/message"
 	"tickets/message/event"
+	"tickets/message/event/handlers"
 
 	"github.com/ThreeDotsLabs/go-event-driven/common/log"
-	watermillMessage "github.com/ThreeDotsLabs/watermill/message"
+	"github.com/ThreeDotsLabs/watermill/components/cqrs"
 	"github.com/labstack/echo/v4"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
@@ -20,8 +21,9 @@ func init() {
 }
 
 type Service struct {
-	watermillRouter *watermillMessage.Router
-	echoRouter      *echo.Echo
+	evtProcessor *cqrs.EventProcessor
+	evtBus       *cqrs.EventBus
+	echoRouter   *echo.Echo
 }
 
 func New(
@@ -31,24 +33,24 @@ func New(
 ) Service {
 	watermillLogger := log.NewWatermill(log.FromContext(context.Background()))
 
-	var redisPublisher watermillMessage.Publisher
-	redisPublisher = message.NewRedisPublisher(redisClient, watermillLogger)
-	redisPublisher = log.CorrelationPublisherDecorator{Publisher: redisPublisher}
+	redisPublisher := message.NewRedisPublisher(redisClient, watermillLogger)
 
-	watermillRouter := message.NewWatermillRouter(
-		receiptsService,
-		spreadsheetsService,
-		redisClient,
-		watermillLogger,
-	)
+	hs := []cqrs.EventHandler{
+		handlers.NewIssueReceiptHandler(receiptsService),
+		handlers.NewAppendToTrackerHandler(spreadsheetsService),
+	}
+
+	evtProcessor, _ := message.NewEventProcessor(hs, redisClient, watermillLogger)
+	evtBus, _ := message.NewEventBus(redisPublisher)
 
 	echoRouter := ticketsHttp.NewHttpRouter(
-		redisPublisher,
+		evtBus,
 		spreadsheetsService,
 	)
 
 	return Service{
-		watermillRouter,
+		evtProcessor,
+		evtBus,
 		echoRouter,
 	}
 }
