@@ -8,7 +8,10 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func NewHttpRouter(evtBus *cqrs.EventBus, spreadsheetsAPIClient SpreadsheetsAPI) *echo.Echo {
+func NewHttpRouter(
+	eventBus *cqrs.EventBus,
+	spreadsheetsAPIClient SpreadsheetsAPI,
+) *echo.Echo {
 	e := libHttp.NewEcho()
 
 	e.GET("/health", func(c echo.Context) error {
@@ -16,7 +19,7 @@ func NewHttpRouter(evtBus *cqrs.EventBus, spreadsheetsAPIClient SpreadsheetsAPI)
 	})
 
 	handler := Handler{
-		evtBus:                evtBus,
+		eventBus:              eventBus,
 		spreadsheetsAPIClient: spreadsheetsAPIClient,
 	}
 

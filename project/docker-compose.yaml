@@ -1,3 +1,5 @@
+version: '3.9'
+
 services:
   gateway:
     image: ghcr.io/threedotslabs/event-driven-gateway:latest
@@ -5,8 +7,6 @@ services:
       - "8888:8080"
     environment:
       SOLUTION_BASE_URL: "http://host.docker.internal:8080/"
-      REDIS_ADDR: "localhost:6379"
-      GATEWAY_ADDR: "http://localhost:8888"
 
     # this allows webhooks from Gateway to call your solution on Linux
     extra_hosts:
@@ -16,3 +16,14 @@ services:
     image: redis:6.2-alpine
     ports:
       - "6379:6379"
+
+  postgres:
+    image: postgres:15.2-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/create_tables.sql:rw

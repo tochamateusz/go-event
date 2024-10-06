@@ -7,7 +7,7 @@ import (
 )
 
 type Handler struct {
-	evtBus                *cqrs.EventBus
+	eventBus              *cqrs.EventBus
 	spreadsheetsAPIClient SpreadsheetsAPI
 }
 

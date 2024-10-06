@@ -30,15 +30,17 @@ func (h Handler) PostTicketsStatus(c echo.Context) error {
 	for _, ticket := range request.Tickets {
 		if ticket.Status == "confirmed" {
 			event := entities.TicketBookingConfirmed{
-				Header:        entities.NewEventHeader(),
+				Header: entities.NewEventHeader(),
+
 				TicketID:      ticket.TicketID,
-				CustomerEmail: ticket.CustomerEmail,
 				Price:         ticket.Price,
+				CustomerEmail: ticket.CustomerEmail,
+
+				BookingID: ticket.BookingID,
 			}
 
-			err = h.evtBus.Publish(c.Request().Context(), event)
-			if err != nil {
-				return err
+			if err := h.eventBus.Publish(c.Request().Context(), event); err != nil {
+				return fmt.Errorf("failed to publish TicketBookingConfirmed event: %w", err)
 			}
 		} else if ticket.Status == "canceled" {
 			event := entities.TicketBookingCanceled{
@@ -47,9 +49,9 @@ func (h Handler) PostTicketsStatus(c echo.Context) error {
 				CustomerEmail: ticket.CustomerEmail,
 				Price:         ticket.Price,
 			}
-			err = h.evtBus.Publish(c.Request().Context(), event)
-			if err != nil {
-				return err
+
+			if err := h.eventBus.Publish(c.Request().Context(), event); err != nil {
+				return fmt.Errorf("failed to publish TicketBookingCanceled event: %w", err)
 			}
 		} else {
 			return fmt.Errorf("unknown ticket status: %s", ticket.Status)
