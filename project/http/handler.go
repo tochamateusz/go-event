@@ -2,12 +2,14 @@ package http
 
 import (
 	"context"
+	"tickets/repositories"
 
 	"github.com/ThreeDotsLabs/watermill/components/cqrs"
 )
 
 type Handler struct {
 	eventBus              *cqrs.EventBus
+	ticketRepository      repositories.TicketRepository
 	spreadsheetsAPIClient SpreadsheetsAPI
 }
 

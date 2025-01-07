@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"tickets/repositories"
 
 	libHttp "github.com/ThreeDotsLabs/go-event-driven/common/http"
 	"github.com/ThreeDotsLabs/watermill/components/cqrs"
@@ -11,6 +12,7 @@ import (
 func NewHttpRouter(
 	eventBus *cqrs.EventBus,
 	spreadsheetsAPIClient SpreadsheetsAPI,
+	ticketRepository repositories.TicketRepository,
 ) *echo.Echo {
 	e := libHttp.NewEcho()
 
@@ -21,9 +23,11 @@ func NewHttpRouter(
 	handler := Handler{
 		eventBus:              eventBus,
 		spreadsheetsAPIClient: spreadsheetsAPIClient,
+		ticketRepository:      ticketRepository,
 	}
 
 	e.POST("/tickets-status", handler.PostTicketsStatus)
+	e.GET("/tickets", handler.Tickets)
 
 	return e
 }

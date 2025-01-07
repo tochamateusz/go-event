@@ -6,6 +6,7 @@ import (
 	ticketsHttp "tickets/http"
 	"tickets/message"
 	"tickets/message/event"
+	"tickets/repositories"
 
 	"github.com/ThreeDotsLabs/go-event-driven/common/log"
 	watermillMessage "github.com/ThreeDotsLabs/watermill/message"
@@ -28,6 +29,7 @@ func New(
 	redisClient *redis.Client,
 	spreadsheetsService event.SpreadsheetsAPI,
 	receiptsService event.ReceiptsService,
+	ticketRepository repositories.TicketRepository,
 ) Service {
 	watermillLogger := log.NewWatermill(log.FromContext(context.Background()))
 
@@ -40,6 +42,7 @@ func New(
 	eventsHandler := event.NewHandler(
 		spreadsheetsService,
 		receiptsService,
+		ticketRepository,
 	)
 
 	eventProcessorConfig := event.NewProcessorConfig(redisClient, watermillLogger)
@@ -53,6 +56,7 @@ func New(
 	echoRouter := ticketsHttp.NewHttpRouter(
 		eventBus,
 		spreadsheetsService,
+		ticketRepository,
 	)
 
 	return Service{

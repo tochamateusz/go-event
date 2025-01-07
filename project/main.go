@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"tickets/api"
 	"tickets/message"
+	"tickets/repositories/postgres"
 	"tickets/service"
 
 	"github.com/ThreeDotsLabs/go-event-driven/common/clients"
@@ -57,10 +58,13 @@ CREATE TABLE IF NOT EXISTS tickets (
 
 	db.MustExec(schema)
 
+	ticketRepository := postgres.NewTicketRepository(db)
+
 	err = service.New(
 		redisClient,
 		spreadsheetsService,
 		receiptsService,
+		ticketRepository,
 	).Run(ctx)
 	if err != nil {
 		panic(err)

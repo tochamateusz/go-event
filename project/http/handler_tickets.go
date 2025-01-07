@@ -8,6 +8,46 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// {
+//         "ticket_id": "<ticket_id>",
+//         "customer_email": "<customer_email>",
+//         "price": {
+//             "amount": "<amount>",
+//             "currency": "<currency>"
+//         }
+//     },
+
+type responseMoney struct {
+	Amount   string `json:"amount"`
+	Currency string `json:"currency"`
+}
+
+type ResponseTicket struct {
+	TicketID      string        `json:"ticket_id"`
+	CustomerEmail string        `json:"customer_email"`
+	Price         responseMoney `json:"price"`
+}
+
+func From(ticket entities.Ticket) ResponseTicket {
+	return ResponseTicket{
+		TicketID:      ticket.TicketID,
+		CustomerEmail: ticket.CustomerEmail,
+		Price: responseMoney{
+			Amount:   ticket.Price.Amount,
+			Currency: ticket.Price.Currency,
+		},
+	}
+}
+
+func (h Handler) Tickets(c echo.Context) error {
+	tickets := h.ticketRepository.GetAll(c.Request().Context())
+	ticketsResponse := []ResponseTicket{}
+	for _, ticket := range tickets {
+		ticketsResponse = append(ticketsResponse, From(ticket))
+	}
+	return c.JSON(http.StatusOK, ticketsResponse)
+}
+
 type ticketsStatusRequest struct {
 	Tickets []ticketStatusRequest `json:"tickets"`
 }
