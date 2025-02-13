@@ -9,7 +9,8 @@ import (
 )
 
 type PostgresTicketRepository struct {
-	db *sqlx.DB
+	db              *sqlx.DB
+	existingTickets map[string]struct{}
 }
 
 // GetAll implements repositories.TicketRepository.
@@ -46,6 +47,11 @@ func (p *PostgresTicketRepository) Delete(ctx context.Context, id string) error 
 
 // Save implements repositories.TicketRepository.
 func (p *PostgresTicketRepository) Save(ctx context.Context, ticket entities.Ticket) error {
+	_, ok := p.existingTickets[ticket.TicketID]
+	if ok {
+		return nil
+	}
+
 	_, err := p.db.Exec(`
 INSERT
 INTO
@@ -63,10 +69,11 @@ VALUES
 	if err != nil {
 		return err
 	}
+	p.existingTickets[ticket.TicketID] = struct{}{}
 
 	return nil
 }
 
 func NewTicketRepository(db *sqlx.DB) repositories.TicketRepository {
-	return &PostgresTicketRepository{db}
+	return &PostgresTicketRepository{db, make(map[string]struct{})}
 }

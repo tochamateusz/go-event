@@ -31,6 +31,10 @@ func NewWatermillRouter(eventProcessorConfig cqrs.EventProcessorConfig, eventHan
 			eventHandler.TicketRefundToSheet,
 		),
 		cqrs.NewEventHandler(
+			"TicketBookingConfirmed",
+			eventHandler.TicketBookingConfirmed,
+		),
+		cqrs.NewEventHandler(
 			"IssueReceipt",
 			eventHandler.IssueReceipt,
 		),

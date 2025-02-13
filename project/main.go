@@ -36,6 +36,7 @@ func main() {
 
 	spreadsheetsService := api.NewSpreadsheetsAPIClient(apiClients)
 	receiptsService := api.NewReceiptsServiceClient(apiClients)
+	printingTicketService := api.NewPrintingTicket(apiClients)
 
 	db, err := sqlx.Open("postgres", os.Getenv("POSTGRES_URL"))
 	if err != nil {
@@ -64,6 +65,7 @@ CREATE TABLE IF NOT EXISTS tickets (
 		redisClient,
 		spreadsheetsService,
 		receiptsService,
+		printingTicketService,
 		ticketRepository,
 	).Run(ctx)
 	if err != nil {

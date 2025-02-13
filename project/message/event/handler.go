@@ -9,12 +9,14 @@ import (
 type Handler struct {
 	spreadsheetsService SpreadsheetsAPI
 	receiptsService     ReceiptsService
+	printTicketService  PrintingTicketService
 	ticketRepository    repositories.TicketRepository
 }
 
 func NewHandler(
 	spreadsheetsService SpreadsheetsAPI,
 	receiptsService ReceiptsService,
+	printTicketService PrintingTicketService,
 	ticketRepository repositories.TicketRepository,
 ) Handler {
 	if spreadsheetsService == nil {
@@ -31,6 +33,7 @@ func NewHandler(
 	return Handler{
 		spreadsheetsService: spreadsheetsService,
 		receiptsService:     receiptsService,
+		printTicketService:  printTicketService,
 		ticketRepository:    ticketRepository,
 	}
 }
@@ -41,4 +44,8 @@ type SpreadsheetsAPI interface {
 
 type ReceiptsService interface {
 	IssueReceipt(ctx context.Context, request entities.IssueReceiptRequest) (entities.IssueReceiptResponse, error)
+}
+
+type PrintingTicketService interface {
+	Print(ctx context.Context, request entities.PrintTicketRequest) (entities.PrintTicketResponse, error)
 }
