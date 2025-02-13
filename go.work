@@ -1,4 +1,6 @@
-go 1.23.0
+go 1.23.3
+
+toolchain go1.23.6
 
 use (
 	./02-async/01-goroutines
@@ -18,5 +20,6 @@ use (
 	./09-cqrs-events/04-event-processor
 	./09-cqrs-events/05-event-handler
 	./09-cqrs-events/06-cqrs-with-consumer-groups
+	./10-at-least-once-delivery/10-idempotency-key-in-api
 	./project
 )
