@@ -45,6 +45,7 @@ func New(
 		receiptsService,
 		printTicketService,
 		ticketRepository,
+		eventBus,
 	)
 
 	eventProcessorConfig := event.NewProcessorConfig(redisClient, watermillLogger)

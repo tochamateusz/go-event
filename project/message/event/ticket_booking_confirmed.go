@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"tickets/entities"
-
-	"github.com/gookit/goutil/dump"
 )
 
 func (h Handler) TicketBookingConfirmed(ctx context.Context, event *entities.TicketBookingConfirmed) error {
@@ -14,8 +12,15 @@ func (h Handler) TicketBookingConfirmed(ctx context.Context, event *entities.Tic
 		FileID:  fmt.Sprintf("%s-ticket.html", event.TicketID),
 		Content: fmt.Sprintf("%s, %s", event.TicketID, event.Price.Amount),
 	}
-	dump.P(request)
 	_, err := h.printTicketService.Print(ctx, request)
+	if err != nil {
+		return err
+	}
+	err = h.eventBus.Publish(ctx, entities.TicketPrinted{
+		Header:   entities.NewEventHeader(),
+		TicketID: event.TicketID,
+		FileName: request.FileID,
+	})
 
 	return err
 }
