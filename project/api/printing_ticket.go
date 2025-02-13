@@ -28,8 +28,11 @@ func (p *PrintingTicket) Print(ctx context.Context, request entities.PrintTicket
 	error,
 ) {
 
-	resp, err := p.clients.Files.PutFilesFileIdContentWithTextBodyWithResponse(ctx,
-		request.FileID, request.Content)
+	resp, err := p.clients.Files.PutFilesFileIdContentWithTextBodyWithResponse(
+		ctx,
+		request.FileID,
+		request.Content,
+	)
 
 	if resp.StatusCode() == http.StatusConflict {
 		log.FromContext(ctx).Infof("file %s already exists", request.FileID)

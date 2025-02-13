@@ -28,12 +28,16 @@ func TestComponent(t *testing.T) {
 
 	spreadsheetsService := &api.SpreadsheetsMock{}
 	receiptsService := &api.ReceiptsMock{}
+	printingTicketService := api.NewPrintingTicketMock()
+	ticketRepository := api.NewTicketRepositoryMock()
 
 	go func() {
 		svc := service.New(
 			redisClient,
 			spreadsheetsService,
 			receiptsService,
+			printingTicketService,
+			ticketRepository,
 		)
 		assert.NoError(t, svc.Run(ctx))
 	}()
@@ -160,6 +164,7 @@ func sendTicketsStatus(t *testing.T, req TicketsStatusRequest) {
 
 	httpReq.Header.Set("Correlation-ID", correlationID)
 	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Idempotency-Key", uuid.NewString())
 
 	resp, err := http.DefaultClient.Do(httpReq)
 	require.NoError(t, err)
