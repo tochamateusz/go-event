@@ -1,21 +1,13 @@
 package http
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"tickets/entities"
 
 	"github.com/labstack/echo/v4"
 )
-
-// {
-//         "ticket_id": "<ticket_id>",
-//         "customer_email": "<customer_email>",
-//         "price": {
-//             "amount": "<amount>",
-//             "currency": "<currency>"
-//         }
-//     },
 
 type responseMoney struct {
 	Amount   string `json:"amount"`
@@ -60,8 +52,15 @@ type ticketStatusRequest struct {
 	BookingID     string         `json:"booking_id"`
 }
 
+var IdempotencyKeyMissing = errors.New("Idempotency-Key header missing")
+
 func (h Handler) PostTicketsStatus(c echo.Context) error {
 	var request ticketsStatusRequest
+	idempotencyKey := c.Request().Header["Idempotency-Key"][0]
+	if idempotencyKey == "" {
+		c.JSON(http.StatusBadRequest, IdempotencyKeyMissing)
+		return IdempotencyKeyMissing
+	}
 	err := c.Bind(&request)
 	if err != nil {
 		return err
@@ -70,7 +69,7 @@ func (h Handler) PostTicketsStatus(c echo.Context) error {
 	for _, ticket := range request.Tickets {
 		if ticket.Status == "confirmed" {
 			event := entities.TicketBookingConfirmed{
-				Header: entities.NewEventHeader(),
+				Header: entities.NewEventHeaderWithIdempotencyKey(idempotencyKey),
 
 				TicketID:      ticket.TicketID,
 				Price:         ticket.Price,
