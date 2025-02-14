@@ -13,6 +13,10 @@ type PostgresTicketRepository struct {
 	existingTickets map[string]struct{}
 }
 
+func NewTicketRepository(db *sqlx.DB) repositories.TicketRepository {
+	return &PostgresTicketRepository{db, make(map[string]struct{})}
+}
+
 // GetAll implements repositories.TicketRepository.
 func (p *PostgresTicketRepository) GetAll(context.Context) []entities.Ticket {
 	rows, err := p.db.Query(`
@@ -74,6 +78,3 @@ VALUES
 	return nil
 }
 
-func NewTicketRepository(db *sqlx.DB) repositories.TicketRepository {
-	return &PostgresTicketRepository{db, make(map[string]struct{})}
-}

@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"tickets/entities"
 
+	"github.com/google/uuid"
+	"github.com/gookit/goutil/dump"
 	"github.com/labstack/echo/v4"
 )
 
@@ -56,11 +58,17 @@ var IdempotencyKeyMissing = errors.New("Idempotency-Key header missing")
 
 func (h Handler) PostTicketsStatus(c echo.Context) error {
 	var request ticketsStatusRequest
-	idempotencyKey := c.Request().Header["Idempotency-Key"][0]
-	if idempotencyKey == "" {
-		c.JSON(http.StatusBadRequest, IdempotencyKeyMissing)
-		return IdempotencyKeyMissing
+	idempotencyKeys := c.Request().Header["Idempotency-Key"]
+	var idempotencyKey string
+
+	if len(idempotencyKeys) <= 0 {
+		idempotencyKey = uuid.NewString()
 	}
+
+	if idempotencyKey == "" {
+		idempotencyKey = uuid.NewString()
+	}
+
 	err := c.Bind(&request)
 	if err != nil {
 		return err
@@ -98,4 +106,39 @@ func (h Handler) PostTicketsStatus(c echo.Context) error {
 	}
 
 	return c.NoContent(http.StatusOK)
+}
+
+// {
+//   "dead_nation_id": "d0b9d5a0-8e1f-4b1a-9f1a-0e8f5e6b9a1a",
+//   "number_of_tickets": 100,
+//   "start_time": "2021-01-01T00:00:00Z",
+//   "title": "The best show ever",
+//   "venue": "The best venue ever"
+// }
+
+type shownRequest struct {
+	DeadNationId    string `json:"dead_nation_id"`
+	NumberOfTickets uint16 `json:"number_of_tickets"`
+	StartTime       string `json:"start_time"`
+	Title           string `json:"title"`
+	Venue           string `json:"venue"`
+}
+
+func (h Handler) Show(c echo.Context) error {
+	var request shownRequest
+	err := c.Bind(&request)
+	if err != nil {
+		return c.NoContent(http.StatusBadRequest)
+	}
+	var showE entities.Shown
+
+	h.showRepository.Save(c.Request().Context(), showE.ShowId, func(show entities.Shown) entities.Shown {
+		show.Amount += 1
+		showE = show
+		return show
+	})
+
+	dump.P(showE)
+
+	return c.JSON(http.StatusCreated, showE)
 }

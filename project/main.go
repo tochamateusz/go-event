@@ -44,7 +44,7 @@ func main() {
 	}
 	defer db.Close()
 
-	var schema = `
+	var schemaTickets = `
 CREATE TABLE IF NOT EXISTS tickets (
 	ticket_id
 		UUID PRIMARY KEY,
@@ -57,9 +57,21 @@ CREATE TABLE IF NOT EXISTS tickets (
     );
 `
 
-	db.MustExec(schema)
+	db.MustExec(schemaTickets)
+
+	var schemaShows = `
+CREATE TABLE IF NOT EXISTS shows (
+	show_id
+		UUID PRIMARY KEY,
+  amount
+		DECIMAL(10,2) NOT NULL
+    );
+`
+
+	db.MustExec(schemaShows)
 
 	ticketRepository := postgres.NewTicketRepository(db)
+	showsRepository := postgres.NewShowsRepository(db)
 
 	err = service.New(
 		redisClient,
@@ -67,6 +79,7 @@ CREATE TABLE IF NOT EXISTS tickets (
 		receiptsService,
 		printingTicketService,
 		ticketRepository,
+		showsRepository,
 	).Run(ctx)
 	if err != nil {
 		panic(err)

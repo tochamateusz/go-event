@@ -31,6 +31,7 @@ func New(
 	receiptsService event.ReceiptsService,
 	printTicketService event.PrintingTicketService,
 	ticketRepository repositories.TicketRepository,
+	showRepository repositories.ShowRepository,
 ) Service {
 	watermillLogger := log.NewWatermill(log.FromContext(context.Background()))
 
@@ -60,6 +61,7 @@ func New(
 		eventBus,
 		spreadsheetsService,
 		ticketRepository,
+		showRepository,
 	)
 
 	return Service{
