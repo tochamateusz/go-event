@@ -7,7 +7,6 @@ import (
 	"tickets/entities"
 
 	"github.com/google/uuid"
-	"github.com/gookit/goutil/dump"
 	"github.com/labstack/echo/v4"
 )
 
@@ -138,7 +137,43 @@ func (h Handler) Show(c echo.Context) error {
 		return show
 	})
 
-	dump.P(showE)
-
 	return c.JSON(http.StatusCreated, showE)
+}
+
+type bookingRequest struct {
+	ShowId          string `json:"show_id"`
+	NumberOfTickets uint16 `json:"number_of_tickets"`
+	CustomerEmail   string `json:"customer_email"`
+}
+
+func (h Handler) BookTickets(c echo.Context) error {
+
+	var request bookingRequest
+	err := c.Bind(&request)
+	if err != nil {
+		return c.NoContent(http.StatusBadRequest)
+	}
+	booking_id := uuid.NewString()
+
+	var bookingEntity entities.Booking
+
+	err = h.bookingRepository.Save(c.Request().Context(), booking_id, func(booking entities.Booking) entities.Booking {
+		bookingEntity = entities.Booking{
+			Id:              booking.Id,
+			ShowId:          request.ShowId,
+			NumberOfTickets: uint(request.NumberOfTickets),
+			CustomerEmail:   request.CustomerEmail,
+		}
+		return bookingEntity
+	})
+
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, booking_id)
+	}
+
+	return c.JSON(http.StatusCreated, struct {
+		BookingId string `json:"booking_id"`
+	}{
+		BookingId: bookingEntity.Id,
+	})
 }

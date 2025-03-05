@@ -70,8 +70,20 @@ CREATE TABLE IF NOT EXISTS shows (
 
 	db.MustExec(schemaShows)
 
+	var schemaBooking = `
+CREATE TABLE IF NOT EXISTS bookings(
+	id UUID PRIMARY KEY UNIQUE,
+	show_id UUID,
+  number_of_tickets DECIMAL(10,2) NOT NULL,
+	customer_email VARCHAR(255) NOT NULL
+);
+`
+
+	db.MustExec(schemaBooking)
+
 	ticketRepository := postgres.NewTicketRepository(db)
 	showsRepository := postgres.NewShowsRepository(db)
+	bookingReposiotry := postgres.NewBookingRepository(db)
 
 	err = service.New(
 		redisClient,
@@ -79,6 +91,7 @@ CREATE TABLE IF NOT EXISTS shows (
 		receiptsService,
 		printingTicketService,
 		ticketRepository,
+		bookingReposiotry,
 		showsRepository,
 	).Run(ctx)
 	if err != nil {

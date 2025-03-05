@@ -6,7 +6,6 @@ import (
 	"tickets/repositories"
 
 	"github.com/google/uuid"
-	"github.com/gookit/goutil/dump"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -61,7 +60,6 @@ VALUES
 		return err
 	}
 
-	dump.P(show, err)
 	return nil
 }
 

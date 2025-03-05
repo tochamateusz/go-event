@@ -11,6 +11,7 @@ type Handler struct {
 	eventBus              *cqrs.EventBus
 	ticketRepository      repositories.TicketRepository
 	showRepository        repositories.ShowRepository
+	bookingRepository     repositories.BookingRepository
 	spreadsheetsAPIClient SpreadsheetsAPI
 }
 
